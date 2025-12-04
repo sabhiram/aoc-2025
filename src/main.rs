@@ -144,6 +144,113 @@ fn three(jolt_size: i32) -> io::Result<u64> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct Bitmap {
+    // 0 = unset, n = neighbor count + 1 (for self).
+    bits: Vec<Vec<i32>>,
+}
+
+impl Bitmap {
+    fn new(width: usize, height: usize) -> Self {
+        Bitmap {
+            bits: vec![vec![0; width]; height],
+        }
+    }
+
+    fn set(&mut self, x: usize, y: usize) {
+        self.bits[y][x] = 1;
+    }
+
+    fn is_set(&self, x: usize, y: usize) -> bool {
+        if y < self.bits.len() && x < self.bits[0].len() {
+            self.bits[y][x] > 0
+        } else {
+            false
+        }
+    }
+
+    fn neighbor_count(&self, x: usize, y: usize) -> i32 {
+        let mut count = 0;
+        for dy in -1i32..=1 {
+            for dx in -1i32..=1 {
+                if dy == 0 && dx == 0 {
+                    continue;
+                }
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx >= 0 && ny >= 0 && self.is_set(nx as usize, ny as usize) {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+}
+
+fn four(recurse: bool) -> io::Result<u64> {
+    let file = File::open("inputs/four.txt")?;
+    let reader = BufReader::new(file);
+    let mut result = 0u64;
+    let width = 137; // 10;
+    let mut bmp = Bitmap::new(width, width);
+    for (row, line) in reader.lines().enumerate() {
+        for (col, c) in line?.chars().enumerate() {
+            if c == '@' {
+                bmp.set(row, col);
+            }
+        }
+    }
+
+    // Setup initial neighbor counts everywhere.
+    for y in 0..width {
+        for x in 0..width {
+            if bmp.is_set(x, y) {
+                bmp.bits[y][x] = bmp.neighbor_count(x, y) + 1;
+            }
+        }
+    }
+
+    loop {
+        // Make a vector of pairs of x,y to keep track of
+        let mut evict_list = vec![];
+
+        // Now count how many have less than 4 neighbors.
+        for y in 0..width {
+            for x in 0..width {
+                if bmp.bits[y][x] > 0 && bmp.bits[y][x] < (4 + 1) {
+                    evict_list.push((x, y));
+                }
+            }
+        }
+
+        result += evict_list.len() as u64;
+
+        if !recurse || evict_list.is_empty() {
+            break;
+        }
+
+        // Update neighbor counts.
+        for (x, y) in evict_list.iter() {
+            bmp.bits[*y][*x] = 0; // Taken.
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    if dy == 0 && dx == 0 {
+                        continue;
+                    }
+                    let nx = *x as i32 + dx;
+                    let ny = *y as i32 + dy;
+                    if nx >= 0 && ny >= 0 && bmp.is_set(nx as usize, ny as usize) {
+                        bmp.bits[ny as usize][nx as usize] -= 1;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 fn main() -> io::Result<()> {
     let result = one_a()?;
     println!("AOC 1a: Result: {}", result);
@@ -162,6 +269,12 @@ fn main() -> io::Result<()> {
 
     let result = three(12)?;
     println!("AOC 3b: Result: {}", result);
+
+    let result = four(false)?;
+    println!("AOC 4a: Result: {}", result);
+
+    let result = four(true)?;
+    println!("AOC 4b: Result: {}", result);
 
     Ok(())
 }
