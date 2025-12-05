@@ -251,6 +251,79 @@ fn four(recurse: bool) -> io::Result<u64> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct RangeList {
+    ranges: Vec<(u64, u64)>,
+}
+
+impl RangeList {
+    fn new() -> Self {
+        RangeList { ranges: vec![] }
+    }
+
+    fn add(&mut self, low: u64, high: u64) {
+        for i in 0..self.ranges.len() {
+            let (r_low, r_high) = self.ranges[i];
+            if low <= r_high && high >= r_low {
+                let new_low = std::cmp::min(low, r_low);
+                let new_high = std::cmp::max(high, r_high);
+                self.ranges.remove(i);
+                self.add(new_low, new_high);
+                return;
+            }
+        }
+        self.ranges.push((low, high));
+    }
+
+    fn check(&self, value: u64) -> bool {
+        for (low, high) in self.ranges.iter() {
+            if value >= *low && value <= *high {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn rsize(&self) -> u64 {
+        let mut total = 0u64;
+        for (low, high) in self.ranges.iter() {
+            total += high - low + 1;
+        }
+        total
+    }
+}
+
+fn five(range_size: bool) -> io::Result<u64> {
+    let file = File::open("inputs/five.txt")?;
+    let reader = BufReader::new(file);
+    let mut result = 0u64;
+    let mut range_set = RangeList::new();
+    let mut range_done = false;
+    for line in reader.lines() {
+        if range_done {
+            if range_set.check(line.as_ref().unwrap().parse().unwrap_or(0)) {
+                result += 1;
+            }
+        } else {
+            if line.as_ref().unwrap().is_empty() {
+                range_done = true;
+                if range_size {
+                    return Ok(range_set.rsize());
+                }
+                continue;
+            }
+
+            let parts: Vec<&str> = line.as_ref().unwrap().split('-').collect();
+            let low: u64 = parts[0].parse().unwrap_or(0);
+            let high: u64 = parts[1].parse().unwrap_or(0);
+            range_set.add(low, high);
+        }
+    }
+
+    Ok(result)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 fn main() -> io::Result<()> {
     let result = one_a()?;
     println!("AOC 1a: Result: {}", result);
@@ -275,6 +348,12 @@ fn main() -> io::Result<()> {
 
     let result = four(true)?;
     println!("AOC 4b: Result: {}", result);
+
+    let result = five(false)?;
+    println!("AOC 5a: Result: {}", result);
+
+    let result = five(true)?;
+    println!("AOC 5b: Result: {}", result);
 
     Ok(())
 }
